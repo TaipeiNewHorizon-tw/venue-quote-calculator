@@ -648,7 +648,10 @@
   }
 
   function makeRow() {
-    return { id: nextId(), date: "", session: "", purpose: "activity" };
+    // 日期預設帶入「明天」（MIN_DATE）：手機上開啟日期選擇器時若沒有預設值，
+    // 部分瀏覽器會先停在「今天」，但今天早於 MIN_DATE 而無法點選，
+    // 讓人以為日期卡住選不動。直接預設成第一個可選日期可以避免這個情況。
+    return { id: nextId(), date: MIN_DATE, session: "", purpose: "activity" };
   }
 
   function isRowComplete(row) {
