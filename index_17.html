@@ -454,6 +454,91 @@
     margin-top: 30px;
   }
 
+  .admin-entry { text-align: center; margin-top: 6px; }
+  .admin-entry button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.76rem;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 4px;
+  }
+  .admin-entry button:hover { color: var(--accent-deep); }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(42,36,29,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 24px;
+    width: 100%;
+    max-width: 360px;
+  }
+  .modal-box h3 {
+    margin: 0 0 4px;
+    font-family: "Noto Serif TC", serif;
+    font-size: 1.15rem;
+    color: var(--ink);
+  }
+  .modal-box .modal-sub {
+    margin: 0 0 16px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .modal-current {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: -8px 0 14px;
+  }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .modal-field input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .modal-field input:focus { outline: none; border-color: var(--accent); }
+  .modal-error {
+    color: var(--danger);
+    background: var(--danger-bg);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    margin-bottom: 14px;
+  }
+  .modal-error[hidden] { display: none; }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
@@ -490,9 +575,47 @@
   </main>
 
   <footer class="foot">臺北文創六樓多功能廳 · 六樓會議室 · 十四樓文創會所 Muse Garden</footer>
+  <div class="admin-entry"><button type="button" id="adminEntryBtn">管理者登入</button></div>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="adminLoginOverlay" hidden>
+  <div class="modal-box">
+    <h3>管理者登入</h3>
+    <p class="modal-sub">登入後可調整目前的場地優惠折扣</p>
+    <p class="modal-error" id="adminLoginError" hidden></p>
+    <form id="adminLoginForm">
+      <div class="modal-field">
+        <label for="adminPasswordInput">管理密碼</label>
+        <input type="password" id="adminPasswordInput" autocomplete="current-password" required />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="adminLoginCancel">取消</button>
+        <button type="submit" class="btn btn-primary">登入</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="adminSettingsOverlay" hidden>
+  <div class="modal-box">
+    <h3>調整場地優惠折扣</h3>
+    <p class="modal-sub">不分場佈／活動／撤場，統一套用在牌價上</p>
+    <p class="modal-current" id="adminCurrentDiscount"></p>
+    <p class="modal-error" id="adminSettingsError" hidden></p>
+    <form id="adminSettingsForm">
+      <div class="modal-field">
+        <label for="adminDiscountInput">折數（輸入 80 代表 8 折，100 代表不打折）</label>
+        <input type="number" id="adminDiscountInput" min="1" max="100" step="0.1" required />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="adminSettingsLogout">登出</button>
+        <button type="submit" class="btn btn-primary">儲存</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -516,7 +639,10 @@
   };
   var PURPOSE_ORDER = ["activity", "loadin", "loadout"];
 
-  // 場地給的優惠折扣：不分場佈／活動／撤場，一律在牌價上打 8 折（如需調整，改這裡即可）
+  // 場地給的優惠折扣：不分場佈／活動／撤場，一律在牌價上打折。
+  // 這裡的數字只是「頁面備援預設值」：頁面載入後會向伺服器（/api/config）要目前管理者設定的折扣，
+  // 若伺服器有回應就會覆蓋這裡的值；只有在伺服器連不上時，才會沿用下面這組數字。
+  // 管理者可從頁面最下方「管理者登入」調整正式的折扣，不需要再改程式碼。
   var VENUE_DISCOUNT = 0.8;
   var VENUE_DISCOUNT_LABEL = "8折";
 
@@ -1085,6 +1211,128 @@
     setTimeout(function () { toastEl.classList.remove("show"); }, 2400);
   }
 
+  // ---------- 管理者：優惠折扣設定 ----------
+  var adminEntryBtn = document.getElementById("adminEntryBtn");
+  var adminLoginOverlay = document.getElementById("adminLoginOverlay");
+  var adminLoginForm = document.getElementById("adminLoginForm");
+  var adminLoginError = document.getElementById("adminLoginError");
+  var adminLoginCancel = document.getElementById("adminLoginCancel");
+  var adminPasswordInput = document.getElementById("adminPasswordInput");
+  var adminSettingsOverlay = document.getElementById("adminSettingsOverlay");
+  var adminSettingsForm = document.getElementById("adminSettingsForm");
+  var adminSettingsError = document.getElementById("adminSettingsError");
+  var adminSettingsLogout = document.getElementById("adminSettingsLogout");
+  var adminDiscountInput = document.getElementById("adminDiscountInput");
+  var adminCurrentDiscount = document.getElementById("adminCurrentDiscount");
+
+  function discountToPercent(discount) {
+    return Math.round(discount * 1000) / 10; // 0.8 -> 80
+  }
+
+  // 頁面先用內建預設值顯示，不卡畫面；載入後才向伺服器要目前真正生效的折扣，
+  // 有拿到才覆蓋並重新算一次報價，拿不到（離線／伺服器還沒設定）就維持預設值。
+  function loadRemoteConfig() {
+    fetch("/api/config", { cache: "no-store" }).then(function (res) {
+      if (!res.ok) return null;
+      return res.json();
+    }).then(function (data) {
+      if (data && typeof data.discount === "number" && data.discountLabel) {
+        VENUE_DISCOUNT = data.discount;
+        VENUE_DISCOUNT_LABEL = data.discountLabel;
+        render();
+      }
+    }).catch(function () {
+      // 讀不到伺服器設定就沿用頁面內建的預設折扣，不影響試算功能
+    });
+  }
+
+  function openLoginModal() {
+    adminLoginError.hidden = true;
+    adminPasswordInput.value = "";
+    adminLoginOverlay.hidden = false;
+    setTimeout(function () { adminPasswordInput.focus(); }, 0);
+  }
+  function closeLoginModal() { adminLoginOverlay.hidden = true; }
+  function openSettingsModal() {
+    adminSettingsError.hidden = true;
+    adminCurrentDiscount.textContent = "目前折扣：" + VENUE_DISCOUNT_LABEL;
+    adminDiscountInput.value = discountToPercent(VENUE_DISCOUNT);
+    adminSettingsOverlay.hidden = false;
+  }
+  function closeSettingsModal() { adminSettingsOverlay.hidden = true; }
+
+  adminEntryBtn.addEventListener("click", openLoginModal);
+  adminLoginCancel.addEventListener("click", closeLoginModal);
+  adminLoginOverlay.addEventListener("click", function (e) {
+    if (e.target === adminLoginOverlay) closeLoginModal();
+  });
+  adminSettingsOverlay.addEventListener("click", function (e) {
+    if (e.target === adminSettingsOverlay) closeSettingsModal();
+  });
+
+  adminLoginForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    adminLoginError.hidden = true;
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ password: adminPasswordInput.value })
+    }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        adminLoginError.textContent = (result.data && result.data.error) || "登入失敗，請確認密碼";
+        adminLoginError.hidden = false;
+        return;
+      }
+      closeLoginModal();
+      openSettingsModal();
+    }).catch(function () {
+      adminLoginError.textContent = "連線失敗，請稍後再試";
+      adminLoginError.hidden = false;
+    });
+  });
+
+  adminSettingsLogout.addEventListener("click", function () {
+    fetch("/api/logout", { method: "POST", credentials: "include" }).catch(function () {});
+    closeSettingsModal();
+  });
+
+  adminSettingsForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    adminSettingsError.hidden = true;
+    var percent = Number(adminDiscountInput.value);
+    if (!isFinite(percent) || percent <= 0 || percent > 100) {
+      adminSettingsError.textContent = "請輸入 1～100 之間的折數";
+      adminSettingsError.hidden = false;
+      return;
+    }
+    fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ discountPercent: percent })
+    }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        adminSettingsError.textContent = (result.data && result.data.error) || "儲存失敗，請重新登入再試";
+        adminSettingsError.hidden = false;
+        return;
+      }
+      VENUE_DISCOUNT = result.data.discount;
+      VENUE_DISCOUNT_LABEL = result.data.discountLabel;
+      render();
+      closeSettingsModal();
+      showToast("折扣已更新為 " + VENUE_DISCOUNT_LABEL);
+    }).catch(function () {
+      adminSettingsError.textContent = "連線失敗，請稍後再試";
+      adminSettingsError.hidden = false;
+    });
+  });
+
   render();
+  loadRemoteConfig();
 })();
 </script>

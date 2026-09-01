@@ -1,0 +1,21 @@
+{
+  // Cloudflare Worker 設定檔。GitHub 推送後 Cloudflare 會照這份設定自動部署。
+  "name": "venue-quote-calculator",
+  "main": "worker.js",
+  "compatibility_date": "2024-09-23",
+
+  // 網站本身的 HTML／CSS／圖片等靜態檔案，交給 Cloudflare 直接處理
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS"
+  },
+
+  // 儲存目前生效的優惠折扣。
+  // 「id」要換成你自己在 Cloudflare 建立的 KV Namespace ID（步驟請看設定說明文件）。
+  "kv_namespaces": [
+    {
+      "binding": "CONFIG_KV",
+      "id": "633db20eea77410aa0f3015a92830841"
+    }
+  ]
+}
