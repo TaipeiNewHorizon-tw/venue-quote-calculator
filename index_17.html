@@ -631,8 +631,8 @@
     evening:   { label: "晚上 18:00–22:00", kind: "evening", startMin: 18*60, endMin: 22*60 },
     // 晚上加購時段：接在活動或撤場之後，客戶只想多用 1～2 小時、不想整包買下完整 4 小時晚上時段時使用。
     // 固定從晚上 18:00 起算，價格＝晚上時段價格 ÷ 4 小時 × 購買時數（見 sessionRate）；用途僅限「活動」或「撤場」，不可「進場」。
-    eveningPartial1: { label: "晚上（加購1小時）18:00–19:00", kind: "eveningPartial", startMin: 18*60, endMin: 19*60, hours: 1 },
-    eveningPartial2: { label: "晚上（加購2小時）18:00–20:00", kind: "eveningPartial", startMin: 18*60, endMin: 20*60, hours: 2 }
+    eveningPartial1: { label: "*晚上（加購1小時）18:00–19:00", kind: "eveningPartial", startMin: 18*60, endMin: 19*60, hours: 1 },
+    eveningPartial2: { label: "*晚上（加購2小時）18:00–20:00", kind: "eveningPartial", startMin: 18*60, endMin: 20*60, hours: 2 }
   };
   var SESSION_ORDER = ["morning", "afternoon", "fullday", "evening", "eveningPartial1", "eveningPartial2"];
 
