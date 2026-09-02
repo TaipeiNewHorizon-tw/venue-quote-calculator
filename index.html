@@ -911,20 +911,19 @@
         }
       }
     }
-    // 只要這個場地項目有進場或撤場，代表整個租期是連續佔用場地，從最早到最晚的時段之間
+    // 租借時段是自場佈或活動開始，從最早到最晚的時段之間都算連續佔用場地，
     // 每天的上午／下午都必須計價，不能跳過（只有晚上時段可以不租不計價）。
-    var hasSetup = completeRows.some(function (r) { return r.purpose !== "activity"; });
-    if (hasSetup) {
-      var gaps = findCoverageGaps(completeRows);
-      if (gaps.length > 0) {
-        var gapLabels = gaps.map(function (g) {
-          return g.date + "（" + weekdayLabel(g.date) + "）" + SESSION_TYPES[g.session].label.split(" ")[0];
-        });
-        errs.push(
-          "有進場或撤場時，租期中間的白天時段（上午／下午）都必須計價，只有晚上可以不租：" +
-          gapLabels.join("、") + " 目前沒有加入時段，請補上或分開報價"
-        );
-      }
+    // 這個檢查不限於有進場／撤場的情況——即使全部都是「活動」時段，
+    // 只要同一天內有時段被跳過（例如上午租、晚上租、卻沒租下午），一樣算漏報價。
+    var gaps = findCoverageGaps(completeRows);
+    if (gaps.length > 0) {
+      var gapLabels = gaps.map(function (g) {
+        return g.date + "（" + weekdayLabel(g.date) + "）" + SESSION_TYPES[g.session].label.split(" ")[0];
+      });
+      errs.push(
+        "租借時段中間的白天時段（上午／下午）都必須計價，只有晚上可以不租：" +
+        gapLabels.join("、") + " 目前沒有加入時段，請補上或分開報價"
+      );
     }
     return errs;
   }
