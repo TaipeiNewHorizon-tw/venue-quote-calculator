@@ -628,9 +628,13 @@
     morning:   { label: "上午 08:00–12:00", kind: "single",  startMin: 8*60,  endMin: 12*60 },
     afternoon: { label: "下午 13:00–17:00", kind: "single",  startMin: 13*60, endMin: 17*60 },
     fullday:   { label: "白天 08:00–17:00", kind: "fullday", startMin: 8*60,  endMin: 17*60 },
-    evening:   { label: "晚上 18:00–22:00", kind: "evening", startMin: 18*60, endMin: 22*60 }
+    evening:   { label: "晚上 18:00–22:00", kind: "evening", startMin: 18*60, endMin: 22*60 },
+    // 晚上加購時段：接在活動或撤場之後，客戶只想多用 1～2 小時、不想整包買下完整 4 小時晚上時段時使用。
+    // 固定從晚上 18:00 起算，價格＝晚上時段價格 ÷ 4 小時 × 購買時數（見 sessionRate）；用途僅限「活動」或「撤場」，不可「進場」。
+    eveningPartial1: { label: "晚上（加購1小時）18:00–19:00", kind: "eveningPartial", startMin: 18*60, endMin: 19*60, hours: 1 },
+    eveningPartial2: { label: "晚上（加購2小時）18:00–20:00", kind: "eveningPartial", startMin: 18*60, endMin: 20*60, hours: 2 }
   };
-  var SESSION_ORDER = ["morning", "afternoon", "fullday", "evening"];
+  var SESSION_ORDER = ["morning", "afternoon", "fullday", "evening", "eveningPartial1", "eveningPartial2"];
 
   var PURPOSES = {
     activity: { label: "活動", short: "活動", mult: 1 },
@@ -638,6 +642,8 @@
     loadout:  { label: "撤場（復原）", short: "撤場", mult: 0.5 }
   };
   var PURPOSE_ORDER = ["activity", "loadin", "loadout"];
+  // 晚上加購時段（eveningPartial1／eveningPartial2）只能選「活動」或「撤場」，不可選「進場」。
+  var EVENING_PARTIAL_PURPOSE_ORDER = ["activity", "loadout"];
 
   // 場地給的優惠折扣：不分場佈／活動／撤場，一律在牌價上打折。
   // 這裡的數字只是「頁面備援預設值」：頁面載入後會向伺服器（/api/config）要目前管理者設定的折扣，
@@ -815,6 +821,8 @@
     var t = SESSION_TYPES[sessionKey];
     if (t.kind === "single") return holiday ? rates[2] : rates[0];
     if (t.kind === "fullday") return holiday ? rates[3] : rates[1];
+    // 晚上加購時段：晚上時段價格（平假日同價）÷ 4 小時 × 購買時數，四捨五入。
+    if (t.kind === "eveningPartial") return Math.round(rates[4] / 4 * t.hours);
     return rates[4];
   }
 
@@ -981,8 +989,10 @@
     }).join("");
   }
 
-  function purposeOptionsHtml(selected) {
-    return PURPOSE_ORDER.map(function (k) {
+  function purposeOptionsHtml(selected, sessionKey) {
+    var t = sessionKey && SESSION_TYPES[sessionKey];
+    var order = (t && t.kind === "eveningPartial") ? EVENING_PARTIAL_PURPOSE_ORDER : PURPOSE_ORDER;
+    return order.map(function (k) {
       return '<option value="' + k + '"' + (k === selected ? " selected" : "") + ">" + PURPOSES[k].label + "</option>";
     }).join("");
   }
@@ -1095,7 +1105,7 @@
         '<div><span class="cell-label">時段</span>' +
           '<select data-action="session-change">' + sessionOptionsHtml(row.session) + '</select></div>' +
         '<div><span class="cell-label">用途</span>' +
-          '<select data-action="purpose-change">' + purposeOptionsHtml(row.purpose) + '</select></div>' +
+          '<select data-action="purpose-change">' + purposeOptionsHtml(row.purpose, row.session) + '</select></div>' +
         '<div class="row-price-actions">' + priceHtml +
           '<button type="button" class="icon-btn" data-action="remove-row" title="刪除這個時段">✕ 移除</button></div>';
       rowsWrap.appendChild(line);
@@ -1252,7 +1262,14 @@
         row.date = chosen;
       }
     }
-    if (action === "session-change") row.session = e.target.value;
+    if (action === "session-change") {
+      row.session = e.target.value;
+      var newSessionType = SESSION_TYPES[row.session];
+      // 晚上加購時段不能選「進場」，如果原本選的是進場就自動改回「活動」。
+      if (newSessionType && newSessionType.kind === "eveningPartial" && row.purpose === "loadin") {
+        row.purpose = "activity";
+      }
+    }
     if (action === "purpose-change") row.purpose = e.target.value;
     render();
   });
