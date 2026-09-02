@@ -729,6 +729,11 @@
     d.setDate(d.getDate() + 1);
     return dateToStr(d);
   }
+  function addDaysStr(dateStr, n) {
+    var d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + n);
+    return dateToStr(d);
+  }
   // 最早可選日期＝明天，當日與過去日期不開放選擇
   var MIN_DATE = tomorrowStr();
 
@@ -822,6 +827,55 @@
     return { price: base * mult, holiday: holiday, base: base, incomplete: false };
   }
 
+  // 場地連續使用檢查：只要這個場地項目有進場或撤場（代表客戶連續佔用場地），
+  // 從最早的時段一路到最晚的時段之間，每一天的上午／下午都要計價，不能整段跳過；
+  // 唯一可以跳過不租不計價的只有「晚上」時段。
+  // 回傳缺少的 {date, session} 清單（找不到缺口就回傳空陣列）。
+  function findCoverageGaps(completeRows) {
+    if (completeRows.length === 0) return [];
+    var covered = {};
+    completeRows.forEach(function (r) {
+      if (r.session === "fullday") {
+        covered[r.date + "|morning"] = true;
+        covered[r.date + "|afternoon"] = true;
+      } else {
+        covered[r.date + "|" + r.session] = true;
+      }
+    });
+
+    function startMinutes(r) { return SESSION_TYPES[r.session].startMin; }
+    function endMinutes(r) { return SESSION_TYPES[r.session].endMin; }
+
+    var byStart = completeRows.slice().sort(function (a, b) {
+      return rowSortKey(a.date, startMinutes(a)).localeCompare(rowSortKey(b.date, startMinutes(b)));
+    });
+    var byEnd = completeRows.slice().sort(function (a, b) {
+      return rowSortKey(a.date, endMinutes(a)).localeCompare(rowSortKey(b.date, endMinutes(b)));
+    });
+    var startRow = byStart[0];
+    var endRow = byEnd[byEnd.length - 1];
+    var rangeStartKey = rowSortKey(startRow.date, startMinutes(startRow));
+    var rangeEndKey = rowSortKey(endRow.date, endMinutes(endRow));
+
+    var DAY_SESSIONS = ["morning", "afternoon", "evening"];
+    var gaps = [];
+    var cursor = startRow.date;
+    var guard = 0;
+    while (cursor <= endRow.date && guard < 2000) {
+      guard++;
+      DAY_SESSIONS.forEach(function (sess) {
+        var slotKey = rowSortKey(cursor, SESSION_TYPES[sess].startMin);
+        if (slotKey < rangeStartKey || slotKey >= rangeEndKey) return; // 租期範圍以外，不用檢查
+        if (sess === "evening") return; // 晚上可以不租，不算缺口
+        if (!covered[cursor + "|" + sess]) {
+          gaps.push({ date: cursor, session: sess });
+        }
+      });
+      cursor = addDaysStr(cursor, 1);
+    }
+    return gaps;
+  }
+
   function validateGroup(group) {
     var errs = [];
     var completeRows = group.rows.filter(isRowComplete);
@@ -857,18 +911,19 @@
         }
       }
     }
-    // 只要這個場地項目有進場或撤場，代表整個租期是連續使用，日期之間不可以跳過整天不承租
-    // （同一天只是沒訂晚上時段沒關係，但不可以整天完全沒有任何時段）
+    // 只要這個場地項目有進場或撤場，代表整個租期是連續佔用場地，從最早到最晚的時段之間
+    // 每天的上午／下午都必須計價，不能跳過（只有晚上時段可以不租不計價）。
     var hasSetup = completeRows.some(function (r) { return r.purpose !== "activity"; });
     if (hasSetup) {
-      var uniqueDates = Array.from(new Set(completeRows.map(function (r) { return r.date; }))).sort();
-      for (var k = 1; k < uniqueDates.length; k++) {
-        var prev = new Date(uniqueDates[k - 1] + "T00:00:00");
-        var curr = new Date(uniqueDates[k] + "T00:00:00");
-        var diffDays = Math.round((curr - prev) / (24 * 3600 * 1000));
-        if (diffDays !== 1) {
-          errs.push("有進場或撤場時，使用日期必須連續：" + uniqueDates[k - 1] + " 與 " + uniqueDates[k] + " 之間跳過了整天沒有承租，請補上中間的日期或分開報價");
-        }
+      var gaps = findCoverageGaps(completeRows);
+      if (gaps.length > 0) {
+        var gapLabels = gaps.map(function (g) {
+          return g.date + "（" + weekdayLabel(g.date) + "）" + SESSION_TYPES[g.session].label.split(" ")[0];
+        });
+        errs.push(
+          "有進場或撤場時，租期中間的白天時段（上午／下午）都必須計價，只有晚上可以不租：" +
+          gapLabels.join("、") + " 目前沒有加入時段，請補上或分開報價"
+        );
       }
     }
     return errs;
