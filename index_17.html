@@ -349,6 +349,9 @@
     margin: 18px 0 10px;
     color: var(--ink);
   }
+  .detail-sections { display: flex; flex-direction: column; }
+  .group-detail-block + .group-detail-block { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
+  .group-detail-block .detail-heading { margin-top: 4px; }
   .detail-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
   table.detail-table { width: 100%; min-width: 800px; border-collapse: collapse; font-size: 0.84rem; }
   table.detail-table th, table.detail-table td {
@@ -568,6 +571,12 @@
       <p class="section-sub">以下為所有場地項目加總後的金額</p>
       <div class="summary-rows" id="summaryRows"></div>
       <div class="disclaimer" id="disclaimerBox"></div>
+    </section>
+
+    <section class="card" id="detailCard" style="margin-top:20px;">
+      <h2>報價明細</h2>
+      <p class="section-sub">以下列出本次試算所選各場地項目的詳細計價內容</p>
+      <div class="detail-sections" id="detailSections"></div>
     </section>
 
     <section class="card" id="contactCard">
@@ -1015,6 +1024,7 @@
   // ---------- Rendering ----------
   var groupsEl = document.getElementById("groups");
   var summaryRowsEl = document.getElementById("summaryRows");
+  var detailSectionsEl = document.getElementById("detailSections");
   var disclaimerBoxEl = document.getElementById("disclaimerBox");
 
   function venueOptionsHtml(selected) {
@@ -1195,11 +1205,28 @@
       wrap.appendChild(warn);
     }
 
+    return wrap;
+  }
+
+  // 各場地類型在「報價明細」區塊使用的標題文字，取代原本統一的「報價明細」，
+  // 讓客戶在報價總計下方一眼就能看出這是哪個場地的明細。
+  var VENUE_DETAIL_HEADING = {
+    functionHall: "多功能廳明細",
+    meetingRoom: "會議室明細",
+    eventSpace: "會所明細"
+  };
+
+  function renderGroupDetail(group, index) {
+    var wrap = document.createElement("div");
+    wrap.className = "group-detail-block";
+    wrap.setAttribute("data-group-detail-id", group.id);
+
     var detailHeading = document.createElement("h3");
     detailHeading.className = "detail-heading";
-    detailHeading.textContent = "報價明細";
+    detailHeading.textContent = VENUE_DETAIL_HEADING[group.venue] || "報價明細";
     wrap.appendChild(detailHeading);
 
+    var errs = validateGroup(group);
     var detail = document.createElement("div");
     detail.innerHTML = detailTableHtml(group, errs.length > 0);
     wrap.appendChild(detail);
@@ -1211,6 +1238,11 @@
     groupsEl.innerHTML = "";
     state.groups.forEach(function (g, i) {
       groupsEl.appendChild(renderGroup(g, i));
+    });
+
+    detailSectionsEl.innerHTML = "";
+    state.groups.forEach(function (g, i) {
+      detailSectionsEl.appendChild(renderGroupDetail(g, i));
     });
 
     var hasError = false;
