@@ -1,5 +1,5 @@
 <meta charset="UTF-8">
-<title>場地租借費用試算表</title>
+<title>場地租借費用試算表 V1.2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -398,6 +398,11 @@
   .summary-line .num { font-variant-numeric: tabular-nums; }
   .summary-line.total { font-size: 1.4rem; font-weight: 800; color: var(--ink); border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
   .summary-line.total .num { color: var(--accent-deep); }
+  .verify-line { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .verify-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 0.82rem; }
+  .verify-badge::before { content: "●"; font-size: 0.6em; }
+  .verify-badge.verify-ok { background: var(--weekday-bg); color: var(--weekday); }
+  .verify-badge.verify-fail { background: var(--danger-bg); color: var(--danger); }
 
   .disclaimer {
     font-size: 0.82rem;
@@ -547,7 +552,7 @@
 <div class="page">
   <header class="hero">
     <span class="eyebrow">臺北文創 Taipei New Horizon｜場地租借</span>
-    <h1>場地租借費用試算</h1>
+    <h1>場地租借費用試算 V1.2</h1>
     <p class="lede">選擇場地、時段與用途（場佈進場／活動／撤場），系統會依平日、假日費率自動試算租金。6樓多功能廳、6樓會議室、14樓文創會所 Muse Garden 這三種場域都可以互相搭配，用下方「＋ 新增場地項目」加選不同樓層／廳別，系統會自動把所有場地項目加總成同一張報價。</p>
     <div class="legend">
       <span class="tag weekday dot">平日價</span>
@@ -942,6 +947,60 @@
     return total;
   }
 
+  // ---------- 報價總計內部第二次獨立檢核 ----------
+  // 目的：畫面顯示「已檢核」之前，用另一套獨立寫成的計算邏輯（不呼叫 sessionRate／rowPrice）
+  // 重新算一次金額，兩套算法都要算出一樣的數字才算通過。如果對不上，會自動重算幾次；
+  // 重算後還是對不上、或計算過程中出錯，就顯示「請人工試算」，提醒現場人員自己再核對一次，
+  // 避免之後改程式邏輯不小心改壞卻沒被發現，報出錯誤金額給客戶。
+  var SESSION_RATE_INDEX_CHECK = {
+    single:  { weekday: 0, holiday: 2 },
+    fullday: { weekday: 1, holiday: 3 }
+  };
+  function sessionRateCheck(rates, sessionKey, holiday) {
+    var t = SESSION_TYPES[sessionKey];
+    var idx = SESSION_RATE_INDEX_CHECK[t.kind];
+    if (idx) return rates[holiday ? idx.holiday : idx.weekday];
+    if (t.kind === "eveningPartial") return Math.round(rates[4] / 4 * t.hours);
+    return rates[4]; // 晚上整段
+  }
+  function rowPriceCheck(group, row) {
+    if (!isRowComplete(row)) return 0;
+    var rates = combinedRates(group);
+    var holiday = isHoliday(row.date);
+    var base = sessionRateCheck(rates, row.session, holiday);
+    return base * PURPOSES[row.purpose].mult;
+  }
+  function groupSubtotalCheck(group) {
+    var total = 0;
+    group.rows.forEach(function (r) { total += rowPriceCheck(group, r); });
+    return total;
+  }
+  function computeSubtotalPrimary(groups) {
+    var s = 0;
+    groups.forEach(function (g) { s += groupSubtotal(g); });
+    return s;
+  }
+  function computeSubtotalCheck(groups) {
+    var s = 0;
+    groups.forEach(function (g) { s += groupSubtotalCheck(g); });
+    return s;
+  }
+  function verifyQuoteTotal(groups) {
+    var lastSubtotal = 0;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        var subtotalA = computeSubtotalPrimary(groups);
+        var subtotalB = computeSubtotalCheck(groups);
+        lastSubtotal = subtotalA;
+        if (subtotalA === subtotalB) return { ok: true, subtotal: subtotalA };
+      } catch (e) {
+        break; // 計算過程出錯，視同無法試算
+      }
+    }
+    // 重算 3 次仍對不上（或中途出錯）：金額仍用主要算法的結果顯示，但標示「請人工試算」
+    return { ok: false, subtotal: lastSubtotal };
+  }
+
   function groupRoomLabel(group) {
     var def = VENUE_DEFS[group.venue];
     if (def.type === "combo") {
@@ -1154,20 +1213,27 @@
       groupsEl.appendChild(renderGroup(g, i));
     });
 
-    var subtotal = 0;
     var hasError = false;
     state.groups.forEach(function (g) {
-      subtotal += groupSubtotal(g);
       if (validateGroup(g).length) hasError = true;
     });
-    var tax = Math.round(subtotal * TAX_RATE);
-    var total = subtotal + tax;
 
-    summaryRowsEl.innerHTML = hasError
-      ? '<div class="quote-blocked">請重新選擇日期活動性質<span class="blocked-sub">上方有場地項目的時段設定尚未符合規則，修正後才會顯示正式報價總金額</span></div>'
-      : '<div class="summary-line"><span>租金小計（未稅）</span><span class="num">NT$ ' + fmt(subtotal) + '</span></div>' +
+    if (hasError) {
+      summaryRowsEl.innerHTML = '<div class="quote-blocked">請重新選擇日期活動性質<span class="blocked-sub">上方有場地項目的時段設定尚未符合規則，修正後才會顯示正式報價總金額</span></div>';
+    } else {
+      var check = verifyQuoteTotal(state.groups);
+      var subtotal = check.subtotal;
+      var tax = Math.round(subtotal * TAX_RATE);
+      var total = subtotal + tax;
+      var verifyBadgeClass = check.ok ? "verify-ok" : "verify-fail";
+      var verifyBadgeText = check.ok ? "已檢核" : "請人工試算";
+
+      summaryRowsEl.innerHTML =
+        '<div class="summary-line"><span>租金小計（未稅）</span><span class="num">NT$ ' + fmt(subtotal) + '</span></div>' +
         '<div class="summary-line"><span>營業稅（5%）</span><span class="num">NT$ ' + fmt(tax) + '</span></div>' +
-        '<div class="summary-line total"><span>總計（含稅）</span><span class="num">NT$ ' + fmt(total) + '</span></div>';
+        '<div class="summary-line total"><span>總計（含稅）</span><span class="num">NT$ ' + fmt(total) + '</span></div>' +
+        '<div class="verify-line"><span class="verify-badge ' + verifyBadgeClass + '">' + verifyBadgeText + '</span></div>';
+    }
 
     disclaimerBoxEl.innerHTML =
       '<p>以上金額為場地租金試算金額，<strong>保證金與超時費另計</strong>，實際保證金／超時費請洽本公司窗口確認。</p>' +
