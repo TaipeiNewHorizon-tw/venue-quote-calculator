@@ -788,8 +788,12 @@
     d.setDate(d.getDate() + n);
     return dateToStr(d);
   }
-  // 最早可選日期＝明天，當日與過去日期不開放選擇
-  var MIN_DATE = tomorrowStr();
+  // 最早可選日期＝明天，當日與過去日期不開放選擇。
+  // 這裡刻意寫成「每次呼叫都重新計算」的函式，而不是頁面載入時算一次就固定住的變數：
+  // 如果只算一次，客戶的瀏覽器分頁只要開著跨過午夜（例如晚上開著頁面沒關、隔天早上才送出報價），
+  // 原本算好的「明天」就會變成「今天」，導致當日日期在沒有任何警告的情況下被誤判成合法可選，
+  // 而且不重新整理網頁就不會恢復正常。改成每次都重新算，就不會有這個問題，也不需要客戶重新整理頁面。
+  function minDateStr() { return tomorrowStr(); }
 
   var WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
   function weekdayLabel(dateStr) {
@@ -834,10 +838,10 @@
   }
 
   function makeRow() {
-    // 日期預設帶入「明天」（MIN_DATE）：手機上開啟日期選擇器時若沒有預設值，
-    // 部分瀏覽器會先停在「今天」，但今天早於 MIN_DATE 而無法點選，
+    // 日期預設帶入「明天」（minDateStr()）：手機上開啟日期選擇器時若沒有預設值，
+    // 部分瀏覽器會先停在「今天」，但今天早於最早可選日期而無法點選，
     // 讓人以為日期卡住選不動。直接預設成第一個可選日期可以避免這個情況。
-    return { id: nextId(), date: MIN_DATE, session: "", purpose: "activity" };
+    return { id: nextId(), date: minDateStr(), session: "", purpose: "activity" };
   }
 
   function isRowComplete(row) {
@@ -1204,7 +1208,7 @@
             '<small class="tag ' + (rp.holiday ? "holiday" : "weekday") + ' dot">' + (rp.holiday ? "假日" : "平日") + '</small></span>';
       line.innerHTML =
         '<div><span class="cell-label">日期</span>' +
-          '<input type="date" data-action="date-change" value="' + row.date + '" min="' + MIN_DATE + '" max="' + MAX_DATE + '" /></div>' +
+          '<input type="date" data-action="date-change" value="' + row.date + '" min="' + minDateStr() + '" max="' + MAX_DATE + '" /></div>' +
         '<div><span class="cell-label">時段</span>' +
           '<select data-action="session-change">' + sessionOptionsHtml(row.session) + '</select></div>' +
         '<div><span class="cell-label">用途</span>' +
@@ -1387,9 +1391,10 @@
     if (!row) return;
     if (action === "date-change") {
       var chosen = e.target.value;
-      if (chosen && (chosen < MIN_DATE || chosen > MAX_DATE)) {
+      var minDate = minDateStr();
+      if (chosen && (chosen < minDate || chosen > MAX_DATE)) {
         row.date = "";
-        showToast("日期只能選明天（" + MIN_DATE + "）以後、" + MAX_DATE + " 以前");
+        showToast("日期只能選明天（" + minDate + "）以後、" + MAX_DATE + " 以前");
       } else {
         row.date = chosen;
       }
