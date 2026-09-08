@@ -121,8 +121,38 @@
     color: var(--ink-soft);
     font-size: 1.02rem;
     max-width: 62ch;
-    margin: 0 0 20px;
+    margin: 0;
   }
+  .lede-details { margin: 0 0 20px; }
+  .lede-summary {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--accent-deep);
+    list-style: none;
+    user-select: none;
+    width: fit-content;
+  }
+  .lede-summary::-webkit-details-marker { display: none; }
+  .lede-summary::before {
+    content: "ⓘ";
+    font-size: 1rem;
+  }
+  .lede-summary::after {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--accent-deep);
+    margin-left: 2px;
+    transition: transform 0.15s ease;
+  }
+  .lede-details[open] .lede-summary::after { transform: rotate(180deg); }
+  .lede-details[open] .lede-summary { margin-bottom: 10px; }
   .legend {
     display: flex;
     flex-wrap: wrap;
@@ -209,14 +239,15 @@
   .room-select-wrap { max-width: 340px; }
 
   .room-checks {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
-    max-width: 480px;
+    max-width: 560px;
   }
   .room-check {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     border: 1.5px solid var(--border);
     border-radius: 8px;
@@ -556,7 +587,10 @@
   <header class="hero">
     <span class="eyebrow">臺北文創 Taipei New Horizon｜場地租借</span>
     <h1>場地租借費用試算 V1.2</h1>
-    <p class="lede">選擇場地、時段與用途（場佈進場／活動／撤場），系統會依平日、假日費率自動試算租金。6樓多功能廳、6樓會議室、14樓文創會所 Muse Garden 這三種場域都可以互相搭配，用下方「＋ 新增場地項目」加選不同樓層／廳別，系統會自動把所有場地項目加總成同一張報價。</p>
+    <details class="lede-details">
+      <summary class="lede-summary">說明</summary>
+      <p class="lede">選擇場地、時段與用途（場佈進場／活動／撤場），系統會依平日、假日費率自動試算租金。6樓多功能廳、6樓會議室、14樓文創會所 Muse Garden 這三種場域都可以互相搭配，用下方「＋ 新增場地項目」加選不同樓層／廳別，系統會自動把所有場地項目加總成同一張報價。</p>
+    </details>
     <div class="legend">
       <span class="tag weekday dot">平日價</span>
       <span class="tag holiday dot">假日價（含六日與國定假日）</span>
