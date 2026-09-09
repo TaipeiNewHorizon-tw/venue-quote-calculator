@@ -260,6 +260,45 @@
   .room-check input { accent-color: var(--accent); }
   .room-check.checked { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
 
+  .addon-section { margin: 16px 0; }
+  .addon-checks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  @media (max-width: 640px) {
+    .addon-checks { grid-template-columns: 1fr; }
+  }
+  .addon-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    background: var(--surface);
+  }
+  .addon-check input[type="checkbox"] { accent-color: var(--accent); flex: 0 0 auto; }
+  .addon-check.checked { border-color: var(--accent); background: var(--accent-soft); }
+  .addon-check-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .addon-check-label { font-weight: 600; font-size: 0.9rem; color: var(--ink); }
+  .addon-check-price { font-size: 0.78rem; color: var(--muted); }
+  .addon-check.checked .addon-check-price { color: var(--accent-deep); }
+  .addon-qty-wrap { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .addon-qty-input {
+    width: 56px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .addon-qty-label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+
   .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -383,8 +422,16 @@
   .detail-sections { display: flex; flex-direction: column; }
   .group-detail-block + .group-detail-block { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
   .group-detail-block .detail-heading { margin-top: 4px; }
+  .addon-detail-heading {
+    font-family: "Noto Serif TC", serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin: 16px 0 8px;
+    color: var(--ink-soft);
+  }
   .detail-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
   table.detail-table { width: 100%; min-width: 800px; border-collapse: collapse; font-size: 0.84rem; }
+  table.addon-detail-table { min-width: 480px; }
   table.detail-table th, table.detail-table td {
     padding: 9px 10px;
     text-align: center;
@@ -740,6 +787,49 @@
   };
   var VENUE_ORDER = ["functionHall", "meetingRoom", "eventSpace"];
 
+  // 加購其他費用（清潔費、水電、設備租借等），來源：臺北文創「其他費用」報價單，2026/01/01 版本。
+  // 這裡的價格全部是「新臺幣／含稅」，跟上面 VENUE_DEFS 的場地租金（未稅、外加 5% 營業稅）計價方式不一樣，
+  // 所以加購金額不會再套用場地的 8 折優惠，也不會再另外加 5% 稅——原始報價單上寫「另洽廠商」或
+  // 「費用另計」、沒有固定金額的項目（例如文創會所的清潔費、網路專線），沒辦法算，故意不放進這裡；
+  // 「投影設備」是每個場地本來就內建的固定配備、不是加購項目，也不放進來。
+  // qty:true 代表這個項目客戶可以自己填數量（例如幾片舞台板、幾天）；qty:false 代表整場只會用一份，
+  // 勾選就等於買 1 份，不需要再填數量。
+  var ADDON_DEFS = {
+    functionHall: [
+      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 3000, unit: "元/日", qty: true, qtyLabel: "天" },
+      { key: "power", label: "電費（開電箱拉大電）", price: 5000, unit: "元/日", qty: true, qtyLabel: "天" },
+      { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "wifi", label: "無線網路", price: 1500, unit: "元/間", qty: true, qtyLabel: "間" },
+      { key: "netline", label: "網路專線（光纖1G/600M頻寬）", price: 2000, unit: "元/專線一條", qty: true, qtyLabel: "條" },
+      { key: "stage", label: "活動舞台板（183×122CM，高30CM）", price: 1000, unit: "元/片", qty: true, qtyLabel: "片" },
+      { key: "whiteboard", label: "大白板", price: 300, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "screen", label: "組合式布幕（120吋、無邊）", price: 3000, unit: "元/場", qty: false },
+      { key: "avset", label: "視訊設備一套（鏡頭、喇叭、腳架）", price: 2500, unit: "元/場", qty: false }
+    ],
+    meetingRoom: [
+      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 1000, unit: "元/日", qty: true, qtyLabel: "天" },
+      { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "wifi", label: "無線網路", price: 800, unit: "元/間", qty: true, qtyLabel: "間" },
+      { key: "netline", label: "網路專線（光纖1G/600M頻寬）", price: 2000, unit: "元/專線一條", qty: true, qtyLabel: "條" },
+      { key: "stage", label: "活動舞台板（183×122CM，高30CM）", price: 1000, unit: "元/片", qty: true, qtyLabel: "片" },
+      { key: "whiteboard", label: "大白板", price: 300, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "avset", label: "視訊設備一套（鏡頭、喇叭、腳架）", price: 2500, unit: "元/場", qty: false }
+    ],
+    eventSpace: [
+      { key: "power", label: "電費（開電箱拉大電）", price: 8000, unit: "元/日", qty: true, qtyLabel: "天" },
+      { key: "kitchen", label: "廚房", price: 20000, unit: "元/日", qty: true, qtyLabel: "天" },
+      { key: "ledFull", label: "LED螢幕（20160×4320，全屏）", price: 300000, unit: "元/日", qty: true, qtyLabel: "天" },
+      { key: "wifi", label: "無線網路", price: 7500, unit: "元/場", qty: false },
+      { key: "stage", label: "活動舞台板（183×122CM，高60CM）", price: 1000, unit: "元/片", qty: true, qtyLabel: "片" },
+      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
+      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" }
+    ]
+  };
+
   // 國定假日（六日以外，需另外標記為假日價的日期）
   // 整理自行政院人事行政總處 115年(2026)／116年(2027) 政府行政機關辦公日曆表及媒體報導彙整，
   // 若與官方公告有出入，請直接修改下方清單。
@@ -831,7 +921,10 @@
   var state = { groups: [] };
 
   function makeGroup(venueKey) {
-    var g = { id: nextId(), venue: venueKey, comboKey: null, rooms: [], rows: [] };
+    // addons：客戶勾選的加購項目，key 是 ADDON_DEFS 裡的品項 key，value 是數量
+    // （qty:false 的項目勾選後固定存 1，不會再變動）。換場地時整個 group 會重建，
+    // 加購項目自然跟著歸零，不會誤把 A 場地的加購帶到 B 場地。
+    var g = { id: nextId(), venue: venueKey, comboKey: null, rooms: [], rows: [], addons: {} };
     if (venueKey === "functionHall") {
       g.comboKey = "A";
       g.rooms = ["A"];
@@ -1000,6 +1093,20 @@
     return total;
   }
 
+  // ---------- 加購其他費用小計（清潔費／水電／設備租借等） ----------
+  // 加購金額已經是含稅價，不套用場地租金的 8 折優惠，也不再另外加 5% 稅金，
+  // 跟場地租金小計是分開兩條算式，最後在 render() 才把兩者加起來變成頁面上的總計。
+  function groupAddonSubtotal(group) {
+    var defs = ADDON_DEFS[group.venue] || [];
+    var total = 0;
+    defs.forEach(function (item) {
+      if (!group.addons || !group.addons.hasOwnProperty(item.key)) return;
+      var qty = item.qty ? (group.addons[item.key] || 1) : 1;
+      total += item.price * qty;
+    });
+    return total;
+  }
+
   // ---------- 報價總計內部第二次獨立檢核 ----------
   // 目的：畫面顯示「已檢核」之前，用另一套獨立寫成的計算邏輯（不呼叫 sessionRate／rowPrice）
   // 重新算一次金額，兩套算法都要算出一樣的數字才算通過。如果對不上，會自動重算幾次；
@@ -1028,6 +1135,24 @@
     group.rows.forEach(function (r) { total += rowPriceCheck(group, r); });
     return total;
   }
+  // 加購小計的獨立檢核算法：不遍歷 ADDON_DEFS 陣列，改成先把這個場地的品項整理成
+  // key -> 品項資料的對照表，再直接用 Object.keys(group.addons) 查表加總——
+  // 跟上面 groupAddonSubtotal() 用 forEach 遍歷陣列、逐一比對 key 的寫法路徑不同，
+  // 才能真的當作第二套獨立驗算，而不是同一段邏輯複製貼上。
+  function groupAddonSubtotalCheck(group) {
+    var defs = ADDON_DEFS[group.venue] || [];
+    var priceMap = {};
+    defs.forEach(function (item) { priceMap[item.key] = item; });
+    var keys = group.addons ? Object.keys(group.addons) : [];
+    var total = 0;
+    for (var i = 0; i < keys.length; i++) {
+      var item = priceMap[keys[i]];
+      if (!item) continue;
+      var qty = item.qty ? (group.addons[keys[i]] || 1) : 1;
+      total += item.price * qty;
+    }
+    return total;
+  }
   function computeSubtotalPrimary(groups) {
     var s = 0;
     groups.forEach(function (g) { s += groupSubtotal(g); });
@@ -1038,20 +1163,36 @@
     groups.forEach(function (g) { s += groupSubtotalCheck(g); });
     return s;
   }
+  function computeAddonPrimary(groups) {
+    var s = 0;
+    groups.forEach(function (g) { s += groupAddonSubtotal(g); });
+    return s;
+  }
+  function computeAddonCheck(groups) {
+    var s = 0;
+    groups.forEach(function (g) { s += groupAddonSubtotalCheck(g); });
+    return s;
+  }
   function verifyQuoteTotal(groups) {
     var lastSubtotal = 0;
+    var lastAddonSubtotal = 0;
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         var subtotalA = computeSubtotalPrimary(groups);
         var subtotalB = computeSubtotalCheck(groups);
+        var addonA = computeAddonPrimary(groups);
+        var addonB = computeAddonCheck(groups);
         lastSubtotal = subtotalA;
-        if (subtotalA === subtotalB) return { ok: true, subtotal: subtotalA };
+        lastAddonSubtotal = addonA;
+        if (subtotalA === subtotalB && addonA === addonB) {
+          return { ok: true, subtotal: subtotalA, addonSubtotal: addonA };
+        }
       } catch (e) {
         break; // 計算過程出錯，視同無法試算
       }
     }
     // 重算 3 次仍對不上（或中途出錯）：金額仍用主要算法的結果顯示，但標示「請人工試算」
-    return { ok: false, subtotal: lastSubtotal };
+    return { ok: false, subtotal: lastSubtotal, addonSubtotal: lastAddonSubtotal };
   }
 
   function groupRoomLabel(group) {
@@ -1152,6 +1293,36 @@
       "</table></div>";
   }
 
+  function addonItemsHtml(group) {
+    var defs = ADDON_DEFS[group.venue] || [];
+    return defs.map(function (item) {
+      var selected = !!(group.addons && group.addons.hasOwnProperty(item.key));
+      var qty = selected ? group.addons[item.key] : 1;
+      var priceLabel = "NT$ " + fmt(item.price) + " / " + item.unit;
+      var qtyHtml = item.qty
+        ? '<span class="addon-qty-wrap">' +
+            '<input type="number" class="addon-qty-input" data-action="addon-qty-change" data-addon-key="' + item.key + '" min="1" step="1" value="' + qty + '"' + (selected ? "" : " disabled") + ' />' +
+            '<span class="addon-qty-label">' + item.qtyLabel + '</span>' +
+          '</span>'
+        : '';
+      return '<label class="addon-check' + (selected ? ' checked' : '') + '">' +
+        '<input type="checkbox" data-action="addon-toggle" data-addon-key="' + item.key + '"' + (selected ? " checked" : "") + ' />' +
+        '<span class="addon-check-main"><span class="addon-check-label">' + item.label + '</span>' +
+        '<span class="addon-check-price">' + priceLabel + '</span></span>' +
+        qtyHtml +
+        '</label>';
+    }).join("");
+  }
+
+  function addonSectionHtml(group) {
+    var defs = ADDON_DEFS[group.venue] || [];
+    if (defs.length === 0) return "";
+    return '<div class="addon-section">' +
+      '<span class="field-label">加購其他費用（可複選，價格已含稅、不再打 8 折）</span>' +
+      '<div class="addon-checks">' + addonItemsHtml(group) + '</div>' +
+      '</div>';
+  }
+
   function renderGroup(group, index) {
     var def = VENUE_DEFS[group.venue];
     var wrap = document.createElement("div");
@@ -1233,6 +1404,13 @@
     addRowBtn.textContent = "＋ 新增時段";
     wrap.appendChild(addRowBtn);
 
+    var addonHtml = addonSectionHtml(group);
+    if (addonHtml) {
+      var addonWrap = document.createElement("div");
+      addonWrap.innerHTML = addonHtml;
+      wrap.appendChild(addonWrap.firstElementChild);
+    }
+
     // 緊接在「新增時段」下方放「新增場地項目」，讓客戶不用往下滑過整個報價明細表才看得到
     var addGroupBtn2 = document.createElement("button");
     addGroupBtn2.type = "button";
@@ -1260,6 +1438,33 @@
     eventSpace: "會所明細"
   };
 
+  function addonDetailTableHtml(group) {
+    var defs = ADDON_DEFS[group.venue] || [];
+    var selected = defs.filter(function (item) {
+      return group.addons && group.addons.hasOwnProperty(item.key);
+    });
+    if (selected.length === 0) return "";
+    var sum = 0;
+    var rowsHtml = selected.map(function (item) {
+      var qty = item.qty ? (group.addons[item.key] || 1) : 1;
+      var lineTotal = item.price * qty;
+      sum += lineTotal;
+      var qtyLabel = item.qty ? (qty + " " + item.qtyLabel) : "1 份";
+      return "<tr>" +
+        "<td>" + item.label + "</td>" +
+        "<td>NT$ " + fmt(item.price) + " / " + item.unit + "</td>" +
+        "<td>" + qtyLabel + "</td>" +
+        '<td class="num accent">' + fmt(lineTotal) + "</td>" +
+        "</tr>";
+    }).join("");
+    return '<h4 class="addon-detail-heading">加購項目明細（已含稅）</h4>' +
+      '<div class="detail-table-wrap"><table class="detail-table addon-detail-table">' +
+      "<thead><tr><th>加購項目</th><th>單價</th><th>數量</th><th>小計（已含稅）</th></tr></thead>" +
+      "<tbody>" + rowsHtml + "</tbody>" +
+      '<tfoot><tr><td colspan="3">加購小計</td><td class="num accent">' + fmt(sum) + "</td></tr></tfoot>" +
+      "</table></div>";
+  }
+
   function renderGroupDetail(group, index) {
     var wrap = document.createElement("div");
     wrap.className = "group-detail-block";
@@ -1274,6 +1479,15 @@
     var detail = document.createElement("div");
     detail.innerHTML = detailTableHtml(group, errs.length > 0);
     wrap.appendChild(detail);
+
+    if (errs.length === 0) {
+      var addonDetailHtml = addonDetailTableHtml(group);
+      if (addonDetailHtml) {
+        var addonDetail = document.createElement("div");
+        addonDetail.innerHTML = addonDetailHtml;
+        wrap.appendChild(addonDetail);
+      }
+    }
 
     return wrap;
   }
@@ -1300,19 +1514,28 @@
       var check = verifyQuoteTotal(state.groups);
       var subtotal = check.subtotal;
       var tax = Math.round(subtotal * TAX_RATE);
-      var total = subtotal + tax;
+      var addonSubtotal = check.addonSubtotal || 0;
+      var total = subtotal + tax + addonSubtotal;
       var verifyBadgeClass = check.ok ? "verify-ok" : "verify-fail";
       var verifyBadgeText = check.ok ? "已檢核" : "請人工試算";
+
+      // 加購金額已經是含稅價，不再另外套用 5% 稅金，所以只在有加購時才顯示這一行，
+      // 直接用「已含稅」的字樣提醒客戶，避免誤會漏算了稅。
+      var addonLineHtml = addonSubtotal > 0
+        ? '<div class="summary-line"><span>加購其他費用小計（已含稅）</span><span class="num">NT$ ' + fmt(addonSubtotal) + '</span></div>'
+        : '';
 
       summaryRowsEl.innerHTML =
         '<div class="summary-line"><span>租金小計（未稅）</span><span class="num">NT$ ' + fmt(subtotal) + '</span></div>' +
         '<div class="summary-line"><span>營業稅（5%）</span><span class="num">NT$ ' + fmt(tax) + '</span></div>' +
+        addonLineHtml +
         '<div class="summary-line total"><span>總計（含稅）</span><span class="num">NT$ ' + fmt(total) + '</span></div>' +
         '<div class="verify-line"><span class="verify-badge ' + verifyBadgeClass + '">' + verifyBadgeText + '</span></div>';
     }
 
     disclaimerBoxEl.innerHTML =
       '<p>以上金額為場地租金試算金額，<strong>保證金與超時費另計</strong>，實際保證金／超時費請洽本公司窗口確認。</p>' +
+      '<p>加購其他費用（清潔費、水電、設備租借等）之金額皆為含稅價，不再套用場地租金的優惠折扣，也不會再加計 5% 營業稅。</p>' +
       '<p>國定假日（含補假日）採計至 2027 年底，資料整理自政府行政機關辦公日曆表；如遇官方公告調整，或所選日期超過 2027 年底，請與我們確認假日價適用範圍。</p>' +
       '<p>本頁試算僅供參考，正式報價與場地保留仍須經本公司書面確認。</p>';
   }
@@ -1388,6 +1611,26 @@
     }
     if (action === "combo-change") {
       group.comboKey = e.target.value;
+      render();
+      return;
+    }
+    if (action === "addon-toggle") {
+      var addonKey = e.target.getAttribute("data-addon-key");
+      if (!group.addons) group.addons = {};
+      if (e.target.checked) {
+        group.addons[addonKey] = 1;
+      } else {
+        delete group.addons[addonKey];
+      }
+      render();
+      return;
+    }
+    if (action === "addon-qty-change") {
+      var qtyKey = e.target.getAttribute("data-addon-key");
+      if (!group.addons || !group.addons.hasOwnProperty(qtyKey)) return;
+      var qtyVal = parseInt(e.target.value, 10);
+      if (!qtyVal || qtyVal < 1) qtyVal = 1;
+      group.addons[qtyKey] = qtyVal;
       render();
       return;
     }
