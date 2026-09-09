@@ -260,7 +260,40 @@
   .room-check input { accent-color: var(--accent); }
   .room-check.checked { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
 
-  .addon-section { margin: 16px 0; }
+  .addon-details { margin: 16px 0; }
+  .addon-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1.5px dashed var(--border);
+    background: transparent;
+    color: var(--accent-deep);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    list-style: none;
+    user-select: none;
+  }
+  .addon-summary:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .addon-summary::-webkit-details-marker { display: none; }
+  .addon-summary::after {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--accent-deep);
+    margin-left: 2px;
+    transition: transform 0.15s ease;
+  }
+  .addon-details[open] .addon-summary { border-style: solid; margin-bottom: 12px; }
+  .addon-details[open] .addon-summary::after { transform: rotate(180deg); }
+  .addon-panel-hint { font-size: 0.78rem; color: var(--muted); margin: 0 0 10px; }
   .addon-checks {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -924,7 +957,10 @@
     // addons：客戶勾選的加購項目，key 是 ADDON_DEFS 裡的品項 key，value 是數量
     // （qty:false 的項目勾選後固定存 1，不會再變動）。換場地時整個 group 會重建，
     // 加購項目自然跟著歸零，不會誤把 A 場地的加購帶到 B 場地。
-    var g = { id: nextId(), venue: venueKey, comboKey: null, rooms: [], rows: [], addons: {} };
+    // addonPanelOpen：加購清單面板目前是展開還是收合，預設收合（false），避免一進頁面
+    // 就看到一長串加購項目；使用者自己點開後會記住這個狀態，畫面因為其他操作重新渲染
+    // 時才不會把使用者剛打開的面板無緣無故蓋回去、變成收合。
+    var g = { id: nextId(), venue: venueKey, comboKey: null, rooms: [], rows: [], addons: {}, addonPanelOpen: false };
     if (venueKey === "functionHall") {
       g.comboKey = "A";
       g.rooms = ["A"];
@@ -1317,10 +1353,20 @@
   function addonSectionHtml(group) {
     var defs = ADDON_DEFS[group.venue] || [];
     if (defs.length === 0) return "";
-    return '<div class="addon-section">' +
-      '<span class="field-label">加購其他費用（可複選，價格已含稅、不再打 8 折）</span>' +
+    // 加購品項清單預設收合，用「＋ 加購其他費用」這個跟「新增場地項目」同一種
+    // 虛線按鈕外觀的 <summary> 呈現，客戶點開才會看到一長串品項，不會一進頁面
+    // 就被漫山遍野的選項淹沒；已經勾選的項目數量會直接顯示在按鈕文字上，
+    // 就算收合起來也能一眼看出目前選了幾項。
+    var selectedCount = group.addons ? Object.keys(group.addons).length : 0;
+    var isOpen = !!group.addonPanelOpen;
+    var summaryText = selectedCount > 0
+      ? "＋ 加購其他費用（已選 " + selectedCount + " 項）"
+      : "＋ 加購其他費用（可複選）";
+    return '<details class="addon-details"' + (isOpen ? " open" : "") + '>' +
+      '<summary class="addon-summary">' + summaryText + '</summary>' +
+      '<p class="addon-panel-hint">價格已含稅、不再打 8 折</p>' +
       '<div class="addon-checks">' + addonItemsHtml(group) + '</div>' +
-      '</div>';
+      '</details>';
   }
 
   function renderGroup(group, index) {
@@ -1659,6 +1705,21 @@
     if (action === "purpose-change") row.purpose = e.target.value;
     render();
   });
+
+  // 加購清單面板（<details class="addon-details">）展開／收合時，把狀態記到
+  // group.addonPanelOpen，這樣之後因為其他操作（新增時段、換日期…）觸發 render()
+  // 整個重新渲染時，才不會把使用者剛打開的加購面板無緣無故蓋回去、變成收合。
+  // 這裡刻意不呼叫 render()：原生 <details> 展開/收合本身畫面已經是對的，只是記錄狀態。
+  // 用 capture 監聽是因為部分瀏覽器版本的 toggle 事件不會冒泡，capture 階段才能確保抓得到。
+  groupsEl.addEventListener("toggle", function (e) {
+    var detailsEl = e.target;
+    if (!detailsEl.classList || !detailsEl.classList.contains("addon-details")) return;
+    var groupEl = detailsEl.closest("[data-group-id]");
+    if (!groupEl) return;
+    var group = state.groups.find(function (g) { return g.id === groupEl.getAttribute("data-group-id"); });
+    if (!group) return;
+    group.addonPanelOpen = detailsEl.open;
+  }, true);
 
   // ---------- Contact / copy ----------
   var toastEl = document.getElementById("toast");
