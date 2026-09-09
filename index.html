@@ -778,6 +778,9 @@
     var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
     return y + "-" + m + "-" + day;
   }
+  function todayStr() {
+    return dateToStr(new Date());
+  }
   function tomorrowStr() {
     var d = new Date();
     d.setDate(d.getDate() + 1);
@@ -788,12 +791,16 @@
     d.setDate(d.getDate() + n);
     return dateToStr(d);
   }
-  // 最早可選日期＝明天，當日與過去日期不開放選擇。
-  // 這裡刻意寫成「每次呼叫都重新計算」的函式，而不是頁面載入時算一次就固定住的變數：
-  // 如果只算一次，客戶的瀏覽器分頁只要開著跨過午夜（例如晚上開著頁面沒關、隔天早上才送出報價），
-  // 原本算好的「明天」就會變成「今天」，導致當日日期在沒有任何警告的情況下被誤判成合法可選，
-  // 而且不重新整理網頁就不會恢復正常。改成每次都重新算，就不會有這個問題，也不需要客戶重新整理頁面。
-  function minDateStr() { return tomorrowStr(); }
+  // 最早可選日期＝今天，過去日期不開放選擇。
+  // 2026/09/09 改回允許選「今天」：手機上（尤其是 iOS Safari 的日曆格式日期選擇器）常常不會真的把
+  // min 這個屬性套用到畫面上——打開日期選擇器時，今天甚至更早的日期一樣可以正常點選、沒有變灰、
+  // 「今天」還會被預設反白選取——只有在客戶按下確認之後，我們自己這邊的檢查才會事後把它擋下來、
+  // 清空重選。結果變成客戶明明在手機上點得到「今天」，卻每次都被打回空白、卡在同一個畫面出不去，
+  // 感覺像整個頁面壞掉、要重新整理才能繼續。這個限制原本就只是為了繞開「日期欄位沒有預設值時，
+  // 手機日期選擇器會停在今天」的顯示問題（不是業務上真的要求提前一天預約），而那個問題已經用
+  // makeRow() 直接帶入預設日期解決了，所以這裡改回允許選今天，只保留「不能選過去日期」這個真正需要
+  // 擋住的規則。跟 minDateStr() 一樣，這裡也刻意寫成每次呼叫都重新計算，不用擔心跨午夜的問題。
+  function minDateStr() { return todayStr(); }
 
   var WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
   function weekdayLabel(dateStr) {
@@ -838,9 +845,8 @@
   }
 
   function makeRow() {
-    // 日期預設帶入「明天」（minDateStr()）：手機上開啟日期選擇器時若沒有預設值，
-    // 部分瀏覽器會先停在「今天」，但今天早於最早可選日期而無法點選，
-    // 讓人以為日期卡住選不動。直接預設成第一個可選日期可以避免這個情況。
+    // 日期預設帶入「今天」（minDateStr()）：直接預設成第一個可選日期，
+    // 避免日期欄位一開始是空的、手機日期選擇器沒有預設值時顯示異常。
     return { id: nextId(), date: minDateStr(), session: "", purpose: "activity" };
   }
 
@@ -1394,7 +1400,7 @@
       var minDate = minDateStr();
       if (chosen && (chosen < minDate || chosen > MAX_DATE)) {
         row.date = "";
-        showToast("日期只能選明天（" + minDate + "）以後、" + MAX_DATE + " 以前");
+        showToast("日期只能選今天（" + minDate + "）以後、" + MAX_DATE + " 以前");
       } else {
         row.date = chosen;
       }
