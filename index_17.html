@@ -835,16 +835,18 @@
   // 「投影設備」是每個場地本來就內建的固定配備、不是加購項目，也不放進來。
   //
   // 2026/09/10 使用者再次確認、改成三種計價模式（pricing 欄位）：
-  //   "flat"          整場固定一份（元/場），勾選即為 1 份，跟天數、數量都無關（目前只有文創會所的無線網路是這種）。
+  //   "flat"          整場固定一份（元/場），勾選即為 1 份，跟天數、數量都無關（文創會所的無線網路、
+  //                   以及清潔費都是這種——清潔費只是提醒客戶「自備餐飲需另收清潔費」，不是依租用
+  //                   天數計價，勾了就是固定一筆，不租天數多寡都一樣，2026/09/10 再次調整確認）。
   //   "autoDays"      沒有數量欄位，勾選後直接用「單價 × 這個場地項目已勾選的不重複日期天數」自動算錢，
   //                   天數不用客戶自己填、系統自動依 group.rows 裡出現過的日期算出來（見 groupBookedDayCount()）。
-  //                   清潔費、電費、廚房、無線網路（多功能廳／會議室）、網路專線、LED螢幕全屏都是這種。
+  //                   電費、廚房、無線網路（多功能廳／會議室）、網路專線、LED螢幕全屏都是這種。
   //   "unitsAutoDays" 客戶要自己選「幾座/幾片/幾組」（不能超過 maxUnits 這個庫存上限），天數一樣自動算，
   //                   總價 = 單價 × 座數 × 自動天數。移動式LED螢幕、活動舞台板、大白板、移動式電子白板、
   //                   移動式電視、組合式布幕、視訊設備一套都是這種，各自的庫存上限（maxUnits）標在下面。
   var ADDON_DEFS = {
     functionHall: [
-      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 3000, unit: "元/日", pricing: "autoDays" },
+      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 3000, unit: "元/場", pricing: "flat" },
       { key: "power", label: "電費（開電箱拉大電）", price: 5000, unit: "元/日", pricing: "autoDays" },
       { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 3, unitLabel: "座" },
       { key: "wifi", label: "無線網路", price: 1500, unit: "元/日", pricing: "autoDays" },
@@ -857,7 +859,7 @@
       { key: "avset", label: "視訊設備一套（鏡頭、喇叭、腳架）", price: 2500, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 2, unitLabel: "組" }
     ],
     meetingRoom: [
-      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 1000, unit: "元/日", pricing: "autoDays" },
+      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 1000, unit: "元/場", pricing: "flat" },
       { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 3, unitLabel: "座" },
       { key: "wifi", label: "無線網路", price: 800, unit: "元/日", pricing: "autoDays" },
       { key: "netline", label: "網路專線（光纖1G/600M頻寬）", price: 2000, unit: "元/日", pricing: "autoDays" },
