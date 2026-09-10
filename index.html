@@ -304,8 +304,9 @@
   }
   .addon-check {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: 6px 10px;
     border: 1.5px solid var(--border);
     border-radius: 10px;
     padding: 10px 12px;
@@ -330,7 +331,14 @@
     padding: 6px 8px;
     text-align: center;
   }
-  .addon-qty-label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+  .addon-qty-label { font-size: 0.78rem; color: var(--muted); }
+  .addon-days-note {
+    flex: 1 0 100%;
+    font-size: 0.72rem;
+    color: var(--muted);
+    padding-left: 26px;
+  }
+  .addon-check.checked .addon-days-note { color: var(--accent-deep); }
 
   .icon-btn {
     display: inline-flex;
@@ -825,43 +833,64 @@
   // 所以加購金額不會再套用場地的 8 折優惠，也不會再另外加 5% 稅——原始報價單上寫「另洽廠商」或
   // 「費用另計」、沒有固定金額的項目（例如文創會所的清潔費、網路專線），沒辦法算，故意不放進這裡；
   // 「投影設備」是每個場地本來就內建的固定配備、不是加購項目，也不放進來。
-  // qty:true 代表這個項目客戶可以自己填數量（例如幾片舞台板、幾天）；qty:false 代表整場只會用一份，
-  // 勾選就等於買 1 份，不需要再填數量。
+  //
+  // 2026/09/10 使用者再次確認、改成三種計價模式（pricing 欄位）：
+  //   "flat"          整場固定一份（元/場），勾選即為 1 份，跟天數、數量都無關（目前只有文創會所的無線網路是這種）。
+  //   "autoDays"      沒有數量欄位，勾選後直接用「單價 × 這個場地項目已勾選的不重複日期天數」自動算錢，
+  //                   天數不用客戶自己填、系統自動依 group.rows 裡出現過的日期算出來（見 groupBookedDayCount()）。
+  //                   清潔費、電費、廚房、無線網路（多功能廳／會議室）、網路專線、LED螢幕全屏都是這種。
+  //   "unitsAutoDays" 客戶要自己選「幾座/幾片/幾組」（不能超過 maxUnits 這個庫存上限），天數一樣自動算，
+  //                   總價 = 單價 × 座數 × 自動天數。移動式LED螢幕、活動舞台板、大白板、移動式電子白板、
+  //                   移動式電視、組合式布幕、視訊設備一套都是這種，各自的庫存上限（maxUnits）標在下面。
   var ADDON_DEFS = {
     functionHall: [
-      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 3000, unit: "元/日", qty: true, qtyLabel: "天" },
-      { key: "power", label: "電費（開電箱拉大電）", price: 5000, unit: "元/日", qty: true, qtyLabel: "天" },
-      { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "wifi", label: "無線網路", price: 1500, unit: "元/間", qty: true, qtyLabel: "間" },
-      { key: "netline", label: "網路專線（光纖1G/600M頻寬）", price: 2000, unit: "元/專線一條", qty: true, qtyLabel: "條" },
-      { key: "stage", label: "活動舞台板（183×122CM，高30CM）", price: 1000, unit: "元/片", qty: true, qtyLabel: "片" },
-      { key: "whiteboard", label: "大白板", price: 300, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "screen", label: "組合式布幕（120吋、無邊）", price: 3000, unit: "元/場", qty: false },
-      { key: "avset", label: "視訊設備一套（鏡頭、喇叭、腳架）", price: 2500, unit: "元/場", qty: false }
+      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 3000, unit: "元/日", pricing: "autoDays" },
+      { key: "power", label: "電費（開電箱拉大電）", price: 5000, unit: "元/日", pricing: "autoDays" },
+      { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 3, unitLabel: "座" },
+      { key: "wifi", label: "無線網路", price: 1500, unit: "元/日", pricing: "autoDays" },
+      { key: "netline", label: "網路專線（光纖1G/600M頻寬）", price: 2000, unit: "元/日", pricing: "autoDays" },
+      { key: "stage", label: "活動舞台板（183×122CM，高30CM）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 10, unitLabel: "片" },
+      { key: "whiteboard", label: "大白板", price: 300, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 3, unitLabel: "座" },
+      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 5, unitLabel: "座" },
+      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 5, unitLabel: "座" },
+      { key: "screen", label: "組合式布幕（120吋、無邊）", price: 3000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 2, unitLabel: "組" },
+      { key: "avset", label: "視訊設備一套（鏡頭、喇叭、腳架）", price: 2500, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 2, unitLabel: "組" }
     ],
     meetingRoom: [
-      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 1000, unit: "元/日", qty: true, qtyLabel: "天" },
-      { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "wifi", label: "無線網路", price: 800, unit: "元/間", qty: true, qtyLabel: "間" },
-      { key: "netline", label: "網路專線（光纖1G/600M頻寬）", price: 2000, unit: "元/專線一條", qty: true, qtyLabel: "條" },
-      { key: "stage", label: "活動舞台板（183×122CM，高30CM）", price: 1000, unit: "元/片", qty: true, qtyLabel: "片" },
-      { key: "whiteboard", label: "大白板", price: 300, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "avset", label: "視訊設備一套（鏡頭、喇叭、腳架）", price: 2500, unit: "元/場", qty: false }
+      { key: "cleaning", label: "清潔費（自備餐飲需另收）", price: 1000, unit: "元/日", pricing: "autoDays" },
+      { key: "ledMobile", label: "移動式LED螢幕（135吋）", price: 30000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 3, unitLabel: "座" },
+      { key: "wifi", label: "無線網路", price: 800, unit: "元/日", pricing: "autoDays" },
+      { key: "netline", label: "網路專線（光纖1G/600M頻寬）", price: 2000, unit: "元/日", pricing: "autoDays" },
+      { key: "stage", label: "活動舞台板（183×122CM，高30CM）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 10, unitLabel: "片" },
+      { key: "whiteboard", label: "大白板", price: 300, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 3, unitLabel: "座" },
+      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 5, unitLabel: "座" },
+      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 5, unitLabel: "座" },
+      { key: "avset", label: "視訊設備一套（鏡頭、喇叭、腳架）", price: 2500, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 2, unitLabel: "組" }
     ],
     eventSpace: [
-      { key: "power", label: "電費（開電箱拉大電）", price: 8000, unit: "元/日", qty: true, qtyLabel: "天" },
-      { key: "kitchen", label: "廚房", price: 20000, unit: "元/日", qty: true, qtyLabel: "天" },
-      { key: "ledFull", label: "LED螢幕（20160×4320，全屏）", price: 300000, unit: "元/日", qty: true, qtyLabel: "天" },
-      { key: "wifi", label: "無線網路", price: 7500, unit: "元/場", qty: false },
-      { key: "stage", label: "活動舞台板（183×122CM，高60CM）", price: 1000, unit: "元/片", qty: true, qtyLabel: "片" },
-      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" },
-      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/座", qty: true, qtyLabel: "座" }
+      { key: "power", label: "電費（開電箱拉大電）", price: 8000, unit: "元/日", pricing: "autoDays" },
+      { key: "kitchen", label: "廚房", price: 20000, unit: "元/日", pricing: "autoDays" },
+      { key: "ledFull", label: "LED螢幕（20160×4320，全屏）", price: 300000, unit: "元/日", pricing: "autoDays" },
+      { key: "wifi", label: "無線網路", price: 7500, unit: "元/場", pricing: "flat" },
+      { key: "stage", label: "活動舞台板（183×122CM，高60CM）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 20, unitLabel: "片" },
+      { key: "smartboard", label: "移動式電子白板（含觸控筆1支）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 5, unitLabel: "座" },
+      { key: "tv", label: "移動式電視（播放影片、圖檔）", price: 1000, unit: "元/日", pricing: "unitsAutoDays", maxUnits: 5, unitLabel: "座" }
     ]
   };
+
+  // 這個場地項目目前總共勾了幾個「不重複」的日期（只看已經填了日期的時段列，session 有沒有選不影響），
+  // 用來給 autoDays／unitsAutoDays 這兩種加購計價模式自動算天數，客戶不用自己填。
+  function groupBookedDayCount(group) {
+    var seen = {};
+    var count = 0;
+    group.rows.forEach(function (r) {
+      if (r.date && !seen[r.date]) {
+        seen[r.date] = true;
+        count++;
+      }
+    });
+    return count;
+  }
 
   // 國定假日（六日以外，需另外標記為假日價的日期）
   // 整理自行政院人事行政總處 115年(2026)／116年(2027) 政府行政機關辦公日曆表及媒體報導彙整，
@@ -1134,11 +1163,18 @@
   // 跟場地租金小計是分開兩條算式，最後在 render() 才把兩者加起來變成頁面上的總計。
   function groupAddonSubtotal(group) {
     var defs = ADDON_DEFS[group.venue] || [];
+    var days = groupBookedDayCount(group);
     var total = 0;
     defs.forEach(function (item) {
       if (!group.addons || !group.addons.hasOwnProperty(item.key)) return;
-      var qty = item.qty ? (group.addons[item.key] || 1) : 1;
-      total += item.price * qty;
+      if (item.pricing === "unitsAutoDays") {
+        var units = group.addons[item.key] || 1;
+        total += item.price * units * days;
+      } else if (item.pricing === "autoDays") {
+        total += item.price * days;
+      } else {
+        total += item.price; // flat：整場固定一份
+      }
     });
     return total;
   }
@@ -1171,6 +1207,16 @@
     group.rows.forEach(function (r) { total += rowPriceCheck(group, r); });
     return total;
   }
+  // 自動天數的獨立檢核算法：不是用「seen 物件」邊掃邊記錄有沒有出現過，改成先把所有日期
+  // 排序、再比較相鄰兩筆是否相同來去重（排序去重法），跟 groupBookedDayCount() 的寫法路徑不同。
+  function groupBookedDayCountCheck(group) {
+    var dates = group.rows.map(function (r) { return r.date; }).filter(function (d) { return !!d; }).sort();
+    var count = 0;
+    for (var i = 0; i < dates.length; i++) {
+      if (i === 0 || dates[i] !== dates[i - 1]) count++;
+    }
+    return count;
+  }
   // 加購小計的獨立檢核算法：不遍歷 ADDON_DEFS 陣列，改成先把這個場地的品項整理成
   // key -> 品項資料的對照表，再直接用 Object.keys(group.addons) 查表加總——
   // 跟上面 groupAddonSubtotal() 用 forEach 遍歷陣列、逐一比對 key 的寫法路徑不同，
@@ -1179,13 +1225,20 @@
     var defs = ADDON_DEFS[group.venue] || [];
     var priceMap = {};
     defs.forEach(function (item) { priceMap[item.key] = item; });
+    var days = groupBookedDayCountCheck(group);
     var keys = group.addons ? Object.keys(group.addons) : [];
     var total = 0;
     for (var i = 0; i < keys.length; i++) {
       var item = priceMap[keys[i]];
       if (!item) continue;
-      var qty = item.qty ? (group.addons[keys[i]] || 1) : 1;
-      total += item.price * qty;
+      if (item.pricing === "unitsAutoDays") {
+        var units = group.addons[keys[i]] || 1;
+        total += item.price * units * days;
+      } else if (item.pricing === "autoDays") {
+        total += item.price * days;
+      } else {
+        total += item.price;
+      }
     }
     return total;
   }
@@ -1331,21 +1384,28 @@
 
   function addonItemsHtml(group) {
     var defs = ADDON_DEFS[group.venue] || [];
+    var days = groupBookedDayCount(group);
+    var daysNote = days > 0 ? ("自動依日期天數：" + days + " 天") : "尚未選擇日期，天數將自動帶入";
     return defs.map(function (item) {
       var selected = !!(group.addons && group.addons.hasOwnProperty(item.key));
-      var qty = selected ? group.addons[item.key] : 1;
+      var units = selected ? group.addons[item.key] : 1;
       var priceLabel = "NT$ " + fmt(item.price) + " / " + item.unit;
-      var qtyHtml = item.qty
-        ? '<span class="addon-qty-wrap">' +
-            '<input type="number" class="addon-qty-input" data-action="addon-qty-change" data-addon-key="' + item.key + '" min="1" step="1" value="' + qty + '"' + (selected ? "" : " disabled") + ' />' +
-            '<span class="addon-qty-label">' + item.qtyLabel + '</span>' +
-          '</span>'
-        : '';
+      var extraHtml = "";
+      if (item.pricing === "unitsAutoDays") {
+        extraHtml =
+          '<span class="addon-qty-wrap">' +
+            '<input type="number" class="addon-qty-input" data-action="addon-qty-change" data-addon-key="' + item.key + '" min="1" max="' + item.maxUnits + '" step="1" value="' + units + '"' + (selected ? "" : " disabled") + ' />' +
+            '<span class="addon-qty-label">' + item.unitLabel + '（最多 ' + item.maxUnits + ' ' + item.unitLabel + '）</span>' +
+          '</span>' +
+          (selected ? '<span class="addon-days-note">' + daysNote + '</span>' : '');
+      } else if (item.pricing === "autoDays") {
+        extraHtml = selected ? '<span class="addon-days-note">' + daysNote + '</span>' : '';
+      }
       return '<label class="addon-check' + (selected ? ' checked' : '') + '">' +
         '<input type="checkbox" data-action="addon-toggle" data-addon-key="' + item.key + '"' + (selected ? " checked" : "") + ' />' +
         '<span class="addon-check-main"><span class="addon-check-label">' + item.label + '</span>' +
         '<span class="addon-check-price">' + priceLabel + '</span></span>' +
-        qtyHtml +
+        extraHtml +
         '</label>';
     }).join("");
   }
@@ -1364,7 +1424,7 @@
       : "＋ 加購其他費用（可複選）";
     return '<details class="addon-details"' + (isOpen ? " open" : "") + '>' +
       '<summary class="addon-summary">' + summaryText + '</summary>' +
-      '<p class="addon-panel-hint">價格已含稅、不再打 8 折</p>' +
+      '<p class="addon-panel-hint">價格已含稅</p>' +
       '<div class="addon-checks">' + addonItemsHtml(group) + '</div>' +
       '</details>';
   }
@@ -1490,12 +1550,22 @@
       return group.addons && group.addons.hasOwnProperty(item.key);
     });
     if (selected.length === 0) return "";
+    var days = groupBookedDayCount(group);
     var sum = 0;
     var rowsHtml = selected.map(function (item) {
-      var qty = item.qty ? (group.addons[item.key] || 1) : 1;
-      var lineTotal = item.price * qty;
+      var qtyLabel, lineTotal;
+      if (item.pricing === "unitsAutoDays") {
+        var units = group.addons[item.key] || 1;
+        lineTotal = item.price * units * days;
+        qtyLabel = units + " " + item.unitLabel + " × " + days + " 天";
+      } else if (item.pricing === "autoDays") {
+        lineTotal = item.price * days;
+        qtyLabel = days + " 天";
+      } else {
+        lineTotal = item.price;
+        qtyLabel = "1 份";
+      }
       sum += lineTotal;
-      var qtyLabel = item.qty ? (qty + " " + item.qtyLabel) : "1 份";
       return "<tr>" +
         "<td>" + item.label + "</td>" +
         "<td>NT$ " + fmt(item.price) + " / " + item.unit + "</td>" +
@@ -1674,8 +1744,11 @@
     if (action === "addon-qty-change") {
       var qtyKey = e.target.getAttribute("data-addon-key");
       if (!group.addons || !group.addons.hasOwnProperty(qtyKey)) return;
+      var qtyDef = (ADDON_DEFS[group.venue] || []).find(function (d) { return d.key === qtyKey; });
       var qtyVal = parseInt(e.target.value, 10);
       if (!qtyVal || qtyVal < 1) qtyVal = 1;
+      // 不能超過這個品項的庫存上限（maxUnits），例如大白板最多只有 3 座可以租。
+      if (qtyDef && qtyDef.maxUnits && qtyVal > qtyDef.maxUnits) qtyVal = qtyDef.maxUnits;
       group.addons[qtyKey] = qtyVal;
       render();
       return;
