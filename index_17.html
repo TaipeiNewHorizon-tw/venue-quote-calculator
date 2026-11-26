@@ -117,6 +117,18 @@
     text-wrap: balance;
     color: var(--ink);
   }
+  .title-note {
+    display: inline-block;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: var(--muted);
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+  @media (max-width: 520px) {
+    .title-note { display: block; margin: 6px 0 0; }
+  }
   .lede {
     color: var(--ink-soft);
     font-size: 1.02rem;
@@ -675,7 +687,7 @@
 <div class="page">
   <header class="hero">
     <span class="eyebrow">臺北文創 Taipei New Horizon｜場地租借</span>
-    <h1>場地租借費用試算 V1.2</h1>
+    <h1>場地租借費用試算 V1.2 <span class="title-note">（僅供參考，實際費用以確認書為主）</span></h1>
     <details class="lede-details">
       <summary class="lede-summary">說明</summary>
       <p class="lede">選擇場地、時段與用途（場佈進場／活動／撤場），系統會依平日、假日費率自動試算租金。6樓多功能廳、6樓會議室、14樓文創會所 Muse Garden 這三種場域都可以互相搭配，用下方「＋ 新增場地項目」加選不同樓層／廳別，系統會自動把所有場地項目加總成同一張報價。本頁試算僅供參考，不具報價效力；若頁面顯示金額與預期有明顯落差，或出現非預期的操作結果，請勿逕自引用，正式報價金額一律以本公司人工複核後核發為準。</p>
