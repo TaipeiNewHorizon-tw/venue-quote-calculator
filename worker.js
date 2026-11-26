@@ -38,12 +38,96 @@ export default {
     if (url.pathname === "/api/logout" && request.method === "POST") {
       return handleLogout();
     }
+    if (url.pathname === "/api/track" && request.method === "POST") {
+      return handleTrack(request, env, url);
+    }
+    if (url.pathname === "/api/metrics" && request.method === "GET") {
+      return handleMetrics(request, env);
+    }
  
     // 其他請求（頁面本身、圖片等）交給靜態檔案處理
     return env.ASSETS.fetch(request);
   }
 };
  
+// ---------------------------------------------------------------------------
+// 匿名使用計數（給彙總儀表板 tnh-hub 看「今日試算次數」）
+//
+// 只記「次數」：每天一筆 KV（stats:YYYY-MM-DD → {estimate, apply_click}），
+// 不記 IP、不設 Cookie、不記任何試算內容或客戶資料。「今日」以臺北時間（UTC+8）計。
+//   estimate     這次造訪第一次算出大於 0 的總金額（每次造訪前端最多送一次）
+//   apply_click  按了「前往使用辦法與申請表格」
+// 防濫用：/api/track 是公開端點，任何人都能呼叫，所以
+//   1. 有 Origin 標頭時必須與本站同源；
+//   2. 每天最多接受 STATS_DAILY_CAP 次事件，超過就直接忽略、不再寫 KV
+//      （KV 免費方案每天只有 1000 次寫入，要留給管理者調折扣用）。
+// ---------------------------------------------------------------------------
+const STATS_EVENTS = ["estimate", "apply_click"];
+const STATS_DAILY_CAP = 500;
+const STATS_TTL_SECONDS = 14 * 24 * 60 * 60;
+
+function taipeiDate(ms) {
+  return new Date(ms + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+async function readStats(env, date) {
+  const stored = await env.CONFIG_KV.get("stats:" + date, "json");
+  return {
+    estimate: (stored && Number(stored.estimate)) || 0,
+    apply_click: (stored && Number(stored.apply_click)) || 0
+  };
+}
+
+async function handleTrack(request, env, url) {
+  const noContent = new Response(null, { status: 204 });
+  const origin = request.headers.get("Origin");
+  if (origin) {
+    let sameOrigin = false;
+    try { sameOrigin = new URL(origin).host === url.host; } catch (e) {}
+    if (!sameOrigin) return new Response(null, { status: 403 });
+  }
+  const body = await safeReadJson(request);
+  const event = body && body.event;
+  if (STATS_EVENTS.indexOf(event) === -1) return new Response(null, { status: 400 });
+  if (!env.CONFIG_KV) return noContent;
+  try {
+    const date = taipeiDate(Date.now());
+    const stats = await readStats(env, date);
+    if (stats.estimate + stats.apply_click >= STATS_DAILY_CAP) return noContent;
+    stats[event] += 1;
+    await env.CONFIG_KV.put("stats:" + date, JSON.stringify(stats), { expirationTtl: STATS_TTL_SECONDS });
+  } catch (e) {
+    // 計數失敗不能影響試算頁
+  }
+  return noContent;
+}
+
+// 給 tnh-hub 讀取：需要 Authorization: Bearer <METRICS_TOKEN>（Worker Secret）。
+// 沒設定 METRICS_TOKEN 時一律拒絕。只回數字。
+async function handleMetrics(request, env) {
+  if (!env.METRICS_TOKEN) {
+    return jsonResponse({ error: "尚未設定 METRICS_TOKEN" }, 503);
+  }
+  const m = /^Bearer (.+)$/.exec(request.headers.get("Authorization") || "");
+  const given = await hmacHex("metrics-compare", m ? m[1] : "");
+  const want = await hmacHex("metrics-compare", env.METRICS_TOKEN);
+  if (!timingSafeEqual(given, want)) {
+    return jsonResponse({ error: "unauthorized" }, 401);
+  }
+  if (!env.CONFIG_KV) {
+    return jsonResponse({ error: "尚未設定 KV 儲存空間" }, 500);
+  }
+  const date = taipeiDate(Date.now());
+  const stats = await readStats(env, date);
+  return jsonResponse({
+    system: "quote",
+    now: new Date().toISOString(),
+    date: date,
+    estimates_today: stats.estimate,
+    apply_clicks_today: stats.apply_click
+  }, 200, { "Cache-Control": "no-store" });
+}
+
 async function handleGetConfig(env) {
   const config = await readConfig(env);
   return jsonResponse(

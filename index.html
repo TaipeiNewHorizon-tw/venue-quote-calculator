@@ -770,6 +770,22 @@
 (function () {
   "use strict";
 
+  // 匿名使用計數：只告訴後台「發生過一次」，不帶任何試算內容或個人資料（見 worker.js）。
+  // 每次造訪每種事件最多送一次，失敗一律忽略，不能影響試算。
+  var trackedEvents = {};
+  function track(eventName) {
+    if (trackedEvents[eventName]) return;
+    trackedEvents[eventName] = true;
+    try {
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: eventName }),
+        keepalive: true
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
   // ---------- Data ----------
   var TAX_RATE = 0.05;
 
@@ -1647,6 +1663,7 @@
       var tax = Math.round(subtotal * TAX_RATE);
       var addonSubtotal = check.addonSubtotal || 0;
       var total = subtotal + tax + addonSubtotal;
+      if (total > 0) track("estimate"); // 這次造訪第一次算出金額
       var verifyBadgeClass = check.ok ? "verify-ok" : "verify-fail";
       var verifyBadgeText = check.ok ? "已檢核" : "請人工試算";
 
@@ -1938,6 +1955,8 @@
       adminSettingsError.hidden = false;
     });
   });
+
+  document.getElementById("applyLink").addEventListener("click", function () { track("apply_click"); });
 
   render();
   loadRemoteConfig();
